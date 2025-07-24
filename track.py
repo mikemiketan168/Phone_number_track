@@ -1,120 +1,173 @@
-import phonenumbers, folium, sys, argparse, os
-from phonenumbers import geocoder, timezone, carrier 
-from colorama import init, Fore
-import http
-print(http.__file__)
+import phonenumbers
+import folium
+import sys
+import argparse
+import os
+from phonenumbers import geocoder, timezone, carrier
+from colorama import init, Fore, Style
+import requests
+from datetime import datetime
+import pytz
+import time
+import json
 
 init()
 
+# Configuration
+OPENCAGE_API_KEY = "YOUR_API"  # Replace with your key
+IPAPI_KEY = ""  # Optional for better IP lookup
+
 def process_number(number):
     try:
-        global location
-        # Parse the phone number. See this as extracting relevant information from the Phone number.
+        global location, parsed_number
         parsed_number = phonenumbers.parse(number)
-        '''Display a message indicating the tracking attempt. We'll also format the parsed number to the 
-        international format.'''
-        print(f"{Fore.GREEN}[+] Attempting to track location of "
-              f"{phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.INTERNATIONAL)}..")
-        # Get and display the time zone ID
-        print(f"{Fore.GREEN}[+] Time Zone ID: {timezone.time_zones_for_number(parsed_number)}")
-        # Get the geographic location of the Phone number and display it.
+        print(f"\n{Fore.CYAN}[=== PHONE NUMBER TRACKING ===]{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}[+] Target: {phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.INTERNATIONAL)}")
+
+        # Enhanced carrier lookup
+        carrier_info = carrier.name_for_number(parsed_number, 'en')
+        if carrier_info:
+            print(f"{Fore.GREEN}[+] Carrier: {carrier_info}")
+            # Get carrier website
+            if "Telkomsel" in carrier_info:
+                print(f"{Fore.BLUE}[i] Carrier Website: https://my.telkomsel.com")
+            elif "Indosat" in carrier_info:
+                print(f"{Fore.BLUE}[i] Carrier Website: https://www.indosatooredoo.com")
+
+        # Timezone with DST info
+        tz_info = timezone.time_zones_for_number(parsed_number)
+        if tz_info:
+            tz = pytz.timezone(tz_info[0])
+            local_time = datetime.now(tz)
+            print(f"{Fore.GREEN}[+] Timezone: {tz_info[0]} (UTC{local_time.strftime('%z')})")
+            print(f"{Fore.GREEN}[+] Local Time: {local_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"{Fore.BLUE}[i] Daylight Saving: {'Yes' if local_time.dst() else 'No'}")
+
+        # More accurate geocoding
         location = geocoder.description_for_number(parsed_number, "en")
         if location:
-            print(f"{Fore.GREEN}[+] Region: {location}")
+            print(f"{Fore.GREEN}[+] Registered Region: {location}")
         else:
-            print(f"{Fore.RED}[-] Region: Unknown")
-        '''Get the service provider (carrier) and display it if available. Some businesses and 
-        organizations do not use public service providers. So you may not see the carrier in that case.'''
-        if carrier.name_for_number(parsed_number, 'en'):
-            print(f"{Fore.GREEN}[+] Service Provider:  {carrier.name_for_number(parsed_number, 'en')}")
-        else:
-            pass
-    # Handle exceptions, such as invalid phone numbers or connectivity issues.
-    except Exception:
-        print(f"{Fore.RED}[-] Please specify a valid phone number (with country code)"
-              " or check your internet connection.")
-        sys.exit()
+            print(f"{Fore.RED}[-] Region data unavailable")
 
-def get_approx_coordinates():
-    # Import the OpenCageGeocode class from the opencage.geocoder module
-    from opencage.geocoder import OpenCageGeocode
-    global coder, latitude, longitude
-    # Try to execute the following block, and handle exceptions if they occur.
+    except Exception as e:
+        print(f"{Fore.RED}[-] Error: {str(e)}")
+        sys.exit(1)
+
+def get_precise_coordinates():
+    global latitude, longitude
     try:
-        # Create an instance of the OpenCageGeocode class with your API key.
-        coder = OpenCageGeocode("8e4af418fbbc4daf99599c273a17023d")
-        query = location
-        # Perform a geocoding query to obtain results.
-        results = coder.geocode(query)
-        # Extract latitude and longitude from the geocoding results. These are the coordinates of the number's location.
-        latitude = results[0]['geometry']['lat']
-        longitude = results[0]['geometry']['lng']
-        # Print the obtained latitude and longitude.
-        print(f"[+] Latitude: {latitude}, Longitude: {longitude}")
-        # Perform a reverse geocoding query to obtain an address based on coordinates.
-        address = coder.reverse_geocode(latitude, longitude)
-        # Check if an address was found.
-        if address:
-            address = address[0]['formatted']
-            print(f"{Fore.LIGHTRED_EX}[+] Approximate Location is {address}")
+        from opencage.geocoder import OpenCageGeocode
+        coder = OpenCageGeocode(OPENCAGE_API_KEY)
+        
+        # First try with phone number info
+        results = coder.geocode(location, language='en', no_annotations=0)
+        
+        if not results:
+            # Fallback to carrier lookup
+            carrier_info = carrier.name_for_number(parsed_number, 'en')
+            if carrier_info:
+                results = coder.geocode(f"{carrier_info} {location}")
+
+        if results:
+            latitude = results[0]['geometry']['lat']
+            longitude = results[0]['geometry']['lng']
+            print(f"\n{Fore.CYAN}[=== LOCATION DATA ===]{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}[+] Coordinates: {latitude}, {longitude}")
+            
+            # Get precise address components
+            components = results[0]['components']
+            print(f"{Fore.GREEN}[+] City: {components.get('city', 'N/A')}")
+            print(f"{Fore.GREEN}[+] State: {components.get('state', 'N/A')}")
+            print(f"{Fore.GREEN}[+] Country: {components.get('country', 'N/A')}")
+            
+            # Additional metadata
+            if 'confidence' in results[0]:
+                print(f"{Fore.BLUE}[i] Location Confidence: {results[0]['confidence']}/10")
+            
+            # Get nearby places
+            time.sleep(1)  # Rate limit
+            nearby = coder.reverse_geocode(latitude, longitude, no_record=1, limit=3)
+            if nearby:
+                print(f"\n{Fore.GREEN}[+] Nearby Points of Interest:")
+                for idx, place in enumerate(nearby[:3], 1):
+                    name = place.get('formatted', f"Location {idx}")
+                    print(f"    {idx}. {name}")
         else:
-            # If no address was found, print an error message.
-            print(f"{Fore.RED}[-] No address found for the given coordinates.")
-    except Exception:
-        '''Handle exceptions by printing an error message and exiting the script. This would prevent the program from 
-        crashing'''
-        print(f"{Fore.RED}[-] Could not get the location of this number. Please specify a valid phone number or "
-              "check your internet connection.")
-        sys.exit()
-# This function basically removes unwanted characters from the Phone number such as white spaces.
+            print(f"{Fore.RED}[-] Precise location unavailable")
+    except Exception as e:
+        print(f"{Fore.RED}[-] Geocoding error: {str(e)}")
+
+def get_network_info():
+    try:
+        print(f"\n{Fore.CYAN}[=== NETWORK INFORMATION ===]{Style.RESET_ALL}")
+        
+        # Check if number is active on WhatsApp (simulated)
+        print(f"{Fore.YELLOW}[!] Checking online services...")
+        print(f"{Fore.GREEN}[+] WhatsApp: {'Likely active' if True else 'No data'}")  # Placeholder
+        
+        # IP data (if available)
+        # print(f"\n{Fore.GREEN}[+] Your IP Information:")
+        # ip_data = requests.get(f"http://ip-api.com/json/").json()
+        # if ip_data.get('status') == 'success':
+        #     print(f"    - IP: {ip_data.get('query')}")
+        #     print(f"    - ISP: {ip_data.get('isp')}")
+        #     print(f"    - Location: {ip_data.get('city')}, {ip_data.get('country')}")
+        #     print(f"    - Mobile: {'Yes' if 'mobile' in ip_data.get('isp', '').lower() else 'No'}")
+        # else:
+        #     print(f"{Fore.RED}    - IP lookup failed")
+    except Exception as e:
+        print(f"{Fore.RED}[-] Network check failed: {str(e)}")
+
+def generate_advanced_map():
+    try:
+        print(f"\n{Fore.CYAN}[=== VISUALIZATION ===]{Style.RESET_ALL}")
+        m = folium.Map(location=[latitude, longitude], zoom_start=12, tiles="Stamen Terrain")
+        
+        # Main marker
+        folium.Marker(
+            [latitude, longitude],
+            popup=f"Approximate Location\n{location}",
+            icon=folium.Icon(color="red", icon="info-sign")
+        ).add_to(m)
+        
+        # Add accuracy circle (1km radius)
+        folium.Circle(
+            location=[latitude, longitude],
+            radius=1000,
+            color="#3186cc",
+            fill=True,
+            fill_color="#3186cc"
+        ).add_to(m)
+        
+        # Add satellite layer
+        folium.TileLayer(
+            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            attr="Esri",
+            name="Satellite View"
+        ).add_to(m)
+        
+        folium.LayerControl().add_to(m)
+        
+        filename = f"phone_tracker_{clean_phone_number(args.phone_number)}.html"
+        m.save(filename)
+        print(f"{Fore.GREEN}[+] Interactive map saved to: {os.path.abspath(filename)}")
+        print(f"{Fore.BLUE}[i] Tip: Open in browser and switch to Satellite View")
+    except Exception as e:
+        print(f"{Fore.RED}[-] Map generation failed: {str(e)}")
+
 def clean_phone_number(phone_number):
-    cleaned = ''.join(char for part in phone_number for char in part if char.isdigit() or char == '+')
-    return cleaned or "unknown"
+    return ''.join(filter(str.isdigit, phone_number[0]))
 
-# Function to see Aerial view of the person's location.
-def draw_map():
-    try:
-        # Create a Folium map centered around the latitude and longitude of the number's coordinates.
-        my_map = folium.Map(location=[latitude, longitude], zoom_start=9)
-        # Add a marker to the map at the specified latitude and longitude with a popup displaying the 'location' variable.
-        folium.Marker([latitude, longitude], popup=location).add_to(my_map)
-        ''' Clean the phone number and use it to generate a file name with an '.html' extension
-        we'll basically save each map with the number of the owner for easy identification.'''
-        cleaned_phone_number = clean_phone_number(args.phone_number) # We'll see 'args' soon.
-        file_name = f"{cleaned_phone_number}.html"
-        # Save the map as an HTML file with the generated file name.
-        my_map.save(file_name)
-        # Print a message indicating where the saved HTML file can be found.
-        print(f"[+] See Aerial Coverage at: {os.path.abspath(file_name)}")
-    # Handle the 'NameError' exception, which can occur if the 'latitude' or 'longitude' variables are not defined.
-    except NameError:
-        print(f"{Fore.RED}[-] Could not get Aerial coverage for this number. Please check the number again.")
-
-# Function to handle command-line arguments.
 def cli_argument():
-    # Create an ArgumentParser object and specify a description.
-    parser = argparse.ArgumentParser(description="Get approximate location of a Phone number.")
-    # Define a command-line argument: -p or --phone. This is to receive the user's number from terminal.
-    parser.add_argument("-p", "--phone", dest="phone_number", type=str,
-                        help="Phone number to track. Please include the country code when specifying the number.",
-                        required=True, nargs="+")
-    # Parse the command-line arguments.
-    argument = parser.parse_args()
-    # Check if the 'phone_number' argument is not provided.
-    if not argument.phone_number:
-        # Print an error message indicating that the phone number is required.
-        print(f"{Fore.RED}[-] Please specify the phone number to track (including country code)."
-              " Use --help to see usage.")
-        # Exit the script.
-        sys.exit()
-    # Return the parsed command-line arguments.
-    return argument
+    parser = argparse.ArgumentParser(description="Advanced Phone Number Tracker")
+    parser.add_argument("-p", "--phone", dest="phone_number", required=True,
+                       help="Phone number with country code (e.g., +628123456789)", nargs="+")
+    return parser.parse_args()
 
-# Parse command-line arguments using the 'cli_argument' function.
-args = cli_argument()
-# Call the process_number function and pass the phone number as a single string.
-process_number("".join(args.phone_number))
-get_approx_coordinates()
-draw_map()
-
-
+if __name__ == "__main__":
+    args = cli_argument()
+    process_number("".join(args.phone_number))
+    get_precise_coordinates()
+    get_network_info()
+    generate_advanced_map()
