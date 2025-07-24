@@ -1,4 +1,4 @@
-### How to Run
+# How to Run
 
 ## -- COPY THE CODE --
 1. If you using Visual Studi Code (VSC) you can make file using Ctrl + n, and if you using terminal use this bash
@@ -37,7 +37,7 @@ nano track3.py
 <img width="463" height="66" alt="image" src="https://github.com/user-attachments/assets/65e0a605-e577-4a70-beb8-985525353066" />
 
 
-##-- INSTALATION REQUIRED --
+## -- INSTALATION REQUIRED --
 1. Open terminal
 
 <img width="1082" height="603" alt="image" src="https://github.com/user-attachments/assets/4444c258-75c9-4ad3-9d36-c2c1beea0273" />
@@ -49,7 +49,7 @@ sudo apt install python3
 python3 -m pip install --user phonenumbers folium colorama pytz
 ```
 
-##-- RUN THE PROGRAM --
+## -- RUN THE PROGRAM --
 1. Once you done with all the step, run using this bash. Change {your phone number} with your phone number
 ```
 python3 ./track3.py -p +1234567891
