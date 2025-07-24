@@ -3,7 +3,7 @@ How to Run
 -- COPY THE CODE --
 1. If you using Visual Studi Code (VSC) you can make file using Ctrl + n, and if you using terminal use this bash
 ```
-nano track2.py
+nano track3.py
 ```
 <img width="1095" height="622" alt="image" src="https://github.com/user-attachments/assets/1fd4830a-2de0-434e-941a-69841856e69f" />
 2. Copy the code 
@@ -35,5 +35,8 @@ python3 -m pip install --user phonenumbers folium colorama pytz
 ```
 
 -- RUN THE PROGRAM --
-1. Once you done with all the step, run using this bash
-<img width="809" height="561" alt="image" src="https://github.com/user-attachments/assets/6e6e524b-3395-46dd-9019-2db22213393f" />
+1. Once you done with all the step, run using this bash. Change {your phone number} with your phone number
+```
+python3 ./track3.py -p +1234567891
+```
+<img width="832" height="536" alt="Screenshot 2025-07-24 125551" src="https://github.com/user-attachments/assets/675009fb-7af9-4e9b-9529-3723e59166c4" />
