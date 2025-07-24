@@ -14,7 +14,7 @@ nano track3.py
 
 3. Save the file using Ctrl + s then Ctrl + x for exit
 
--- API KEY --
+## -- API KEY --
 1. First we need an API key to track our phone number. Open https://opencagedata.com/api#quickstart
 
  <img width="507" height="494" alt="image" src="https://github.com/user-attachments/assets/93eb04bb-a344-4913-abfa-69e027424429" />
